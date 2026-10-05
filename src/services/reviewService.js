@@ -238,20 +238,32 @@ export const addReview = async ({ name, email, role, rating, message }) => {
 
 /**
  * Real-time Global Likes Subscription via Firestore onSnapshot
+ * Document: stats/portfolio-likes, field: totalLikes
  */
 export const subscribeToLikes = (callback) => {
   if (db && isFirebaseConfigured) {
     try {
-      const likesDocRef = doc(db, 'stats', 'likes');
+      const likesDocRef = doc(db, 'stats', 'portfolio-likes');
 
       const unsubscribe = onSnapshot(
         likesDocRef,
-        (snap) => {
+        async (snap) => {
           if (snap.exists()) {
             const data = snap.data();
-            callback(Number(data.count) || 0);
+            const total = typeof data.totalLikes === 'number' 
+              ? data.totalLikes 
+              : typeof data.count === 'number' 
+                ? data.count 
+                : 0;
+            callback(total);
           } else {
+            // Auto-initialize document with totalLikes: 0 if missing
             callback(0);
+            try {
+              await setDoc(likesDocRef, { totalLikes: 0 }, { merge: true });
+            } catch (err) {
+              console.warn('Could not auto-initialize stats/portfolio-likes:', err);
+            }
           }
         },
         (error) => {
@@ -286,13 +298,13 @@ export const subscribeToLikes = (callback) => {
 };
 
 /**
- * Increment Global Likes
+ * Increment Global Likes in Firestore stats/portfolio-likes using increment(1)
  */
 export const incrementLikes = async () => {
   if (db && isFirebaseConfigured) {
     try {
-      const likesDocRef = doc(db, 'stats', 'likes');
-      await setDoc(likesDocRef, { count: increment(1) }, { merge: true });
+      const likesDocRef = doc(db, 'stats', 'portfolio-likes');
+      await setDoc(likesDocRef, { totalLikes: increment(1) }, { merge: true });
       return;
     } catch (err) {
       console.warn('Firestore increment likes error, falling back to local:', err);
@@ -305,3 +317,4 @@ export const incrementLikes = async () => {
   window.dispatchEvent(new CustomEvent('portfolio-likes-updated'));
   return next;
 };
+

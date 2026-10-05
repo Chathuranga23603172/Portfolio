@@ -14,15 +14,16 @@ import {
   orderBy, 
   onSnapshot, 
   addDoc, 
-  serverTimestamp 
+  serverTimestamp,
+  doc,
+  setDoc,
+  increment
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase';
 import { 
   formatReviewTimestamp, 
   getInitials, 
-  parseReviewDoc, 
-  subscribeToLikes, 
-  incrementLikes 
+  parseReviewDoc
 } from '../services/reviewService';
 
 export default function Reviews() {
@@ -48,9 +49,10 @@ export default function Reviews() {
   const [formError, setFormError] = useState('');
   const [filterRating, setFilterRating] = useState('all'); // all | 5 | verified
 
-  // 1. True Real-Time Listener inside useEffect
+  // 1 & 2. True Real-Time Listeners for Reviews and Global Likes inside useEffect
   useEffect(() => {
     let unsubscribeReviews = () => {};
+    let unsubscribeLikes = () => {};
 
     if (db && isFirebaseConfigured) {
       try {
@@ -58,7 +60,7 @@ export default function Reviews() {
         const reviewsRef = collection(db, 'reviews');
         const q = query(reviewsRef, orderBy('createdAt', 'desc'));
 
-        // Real-Time onSnapshot listener: updates live across all connected clients without reload
+        // Real-Time onSnapshot listener for reviews
         unsubscribeReviews = onSnapshot(
           q,
           (snapshot) => {
@@ -73,8 +75,38 @@ export default function Reviews() {
             setSyncError(error.message);
           }
         );
+
+        // 1, 2 & 5. Real-Time onSnapshot listener for stats/portfolio-likes
+        const likesDocRef = doc(db, 'stats', 'portfolio-likes');
+        unsubscribeLikes = onSnapshot(
+          likesDocRef,
+          async (snap) => {
+            if (snap.exists()) {
+              const data = snap.data();
+              const total = typeof data.totalLikes === 'number'
+                ? data.totalLikes
+                : typeof data.count === 'number'
+                  ? data.count
+                  : 0;
+              setLikes(total);
+            } else {
+              // 5. Initialization: Auto-initialize with 0 if stats/portfolio-likes does not exist
+              setLikes(0);
+              try {
+                await setDoc(likesDocRef, { totalLikes: 0 }, { merge: true });
+              } catch (initErr) {
+                console.warn('Could not auto-initialize stats/portfolio-likes:', initErr);
+              }
+            }
+          },
+          (error) => {
+            console.warn('Live Firestore likes listener error:', error);
+            const local = Number(localStorage.getItem('portfolio_real_likes')) || 0;
+            setLikes(local);
+          }
+        );
       } catch (err) {
-        console.error('Error creating live Firestore query:', err);
+        console.error('Error creating live Firestore listeners:', err);
         setLiveStatus('error');
         setSyncError(err.message);
       }
@@ -84,25 +116,34 @@ export default function Reviews() {
       const local = JSON.parse(localStorage.getItem('portfolio_real_reviews') || '[]');
       setReviews(local);
 
+      const localLikes = Number(localStorage.getItem('portfolio_real_likes')) || 0;
+      setLikes(localLikes);
+
       const handleStorageUpdate = () => {
-        const updated = JSON.parse(localStorage.getItem('portfolio_real_reviews') || '[]');
-        setReviews(updated);
+        const updatedReviews = JSON.parse(localStorage.getItem('portfolio_real_reviews') || '[]');
+        setReviews(updatedReviews);
+        const updatedLikes = Number(localStorage.getItem('portfolio_real_likes')) || 0;
+        setLikes(updatedLikes);
       };
       window.addEventListener('storage', handleStorageUpdate);
       window.addEventListener('portfolio-review-added', handleStorageUpdate);
+      window.addEventListener('portfolio-likes-updated', handleStorageUpdate);
       unsubscribeReviews = () => {
         window.removeEventListener('storage', handleStorageUpdate);
         window.removeEventListener('portfolio-review-added', handleStorageUpdate);
+        window.removeEventListener('portfolio-likes-updated', handleStorageUpdate);
       };
     }
 
-    // Subscribe to live likes
-    const unsubscribeLikes = subscribeToLikes((count) => {
-      setLikes(count);
-    });
-
-    const storedLiked = localStorage.getItem('portfolio_user_has_liked') === 'true';
-    setHasLiked(storedLiked);
+    // 3. One Like Per User Restriction: Check localStorage on load
+    try {
+      const storedLiked = 
+        localStorage.getItem('hasLikedPortfolio') === 'true' || 
+        localStorage.getItem('portfolio_user_has_liked') === 'true';
+      setHasLiked(storedLiked);
+    } catch {
+      setHasLiked(false);
+    }
 
     return () => {
       if (typeof unsubscribeReviews === 'function') unsubscribeReviews();
@@ -110,19 +151,24 @@ export default function Reviews() {
     };
   }, []);
 
-  // Handle Heart Like Button click
+  // 4. Increment Logic: One like per user and safe Firestore increment(1)
   const handleLike = async () => {
-    if (hasLiked) return;
-    try {
-      if (typeof window !== 'undefined' && localStorage.getItem('portfolio_user_has_liked') === 'true') {
-        setHasLiked(true);
-        return;
-      }
-    } catch {
-      // Continue if localStorage blocked
+    // Check if user already liked
+    const alreadyLiked = 
+      hasLiked || 
+      (typeof window !== 'undefined' && (
+        localStorage.getItem('hasLikedPortfolio') === 'true' || 
+        localStorage.getItem('portfolio_user_has_liked') === 'true'
+      ));
+
+    if (alreadyLiked) {
+      setHasLiked(true);
+      return;
     }
 
+    // Immediately set the localStorage flag to true and update the UI to the "Liked!" state
     try {
+      localStorage.setItem('hasLikedPortfolio', 'true');
       localStorage.setItem('portfolio_user_has_liked', 'true');
     } catch (e) {
       console.warn('LocalStorage error:', e);
@@ -144,10 +190,19 @@ export default function Reviews() {
       colors: ['#ec4899', '#f43f5e', '#8b5cf6', '#06b6d4'],
     });
 
-    try {
-      await incrementLikes();
-    } catch (err) {
-      console.error('Failed to increment likes:', err);
+    // Send an update to Firestore using increment(1) method on stats/portfolio-likes
+    if (db && isFirebaseConfigured) {
+      try {
+        const likesDocRef = doc(db, 'stats', 'portfolio-likes');
+        await setDoc(likesDocRef, { totalLikes: increment(1) }, { merge: true });
+      } catch (err) {
+        console.error('Failed to increment global likes in Firestore:', err);
+      }
+    } else {
+      const current = Number(localStorage.getItem('portfolio_real_likes')) || 0;
+      const next = current + 1;
+      localStorage.setItem('portfolio_real_likes', String(next));
+      window.dispatchEvent(new CustomEvent('portfolio-likes-updated'));
     }
   };
 
