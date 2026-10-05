@@ -1,17 +1,28 @@
+"use client";
+
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Heart, Star, MessageSquare, Sparkles, Send, 
-  CheckCircle2, Clock, ThumbsUp, AlertCircle, 
-  Filter, ShieldCheck, Quote, ChevronDown, Flame, Mail
+  Heart, Star, MessageSquare, Send, 
+  CheckCircle2, Clock, AlertCircle, 
+  ShieldCheck, Flame, Mail, Wifi
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { 
-  subscribeToReviews, 
+  collection, 
+  query, 
+  orderBy, 
+  onSnapshot, 
+  addDoc, 
+  serverTimestamp 
+} from 'firebase/firestore';
+import { db, isFirebaseConfigured } from '../firebase';
+import { 
+  formatReviewTimestamp, 
+  getInitials, 
+  parseReviewDoc, 
   subscribeToLikes, 
-  addReview, 
-  incrementLikes, 
-  isFirebaseConfigured 
+  incrementLikes 
 } from '../services/reviewService';
 
 export default function Reviews() {
@@ -20,6 +31,10 @@ export default function Reviews() {
   const [hasLiked, setHasLiked] = useState(false);
   const [floatingHearts, setFloatingHearts] = useState([]);
   
+  // Real-time synchronization state
+  const [liveStatus, setLiveStatus] = useState('connecting'); // connecting | connected | unconfigured | error
+  const [syncError, setSyncError] = useState(null);
+
   // Form State
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -32,33 +47,71 @@ export default function Reviews() {
   const [formStatus, setFormStatus] = useState('idle'); // idle | submitting | success | error
   const [formError, setFormError] = useState('');
   const [filterRating, setFilterRating] = useState('all'); // all | 5 | verified
-  const [isFirebaseLive, setIsFirebaseLive] = useState(false);
 
-  // Check initial local like status
+  // 1. True Real-Time Listener inside useEffect
   useEffect(() => {
-    setIsFirebaseLive(isFirebaseConfigured());
+    let unsubscribeReviews = () => {};
+
+    if (db && isFirebaseConfigured) {
+      try {
+        // Query ALL reviews ordered by createdAt descending (global visibility, no user ID filtering)
+        const reviewsRef = collection(db, 'reviews');
+        const q = query(reviewsRef, orderBy('createdAt', 'desc'));
+
+        // Real-Time onSnapshot listener: updates live across all connected clients without reload
+        unsubscribeReviews = onSnapshot(
+          q,
+          (snapshot) => {
+            const liveReviews = snapshot.docs.map(parseReviewDoc);
+            setReviews(liveReviews);
+            setLiveStatus('connected');
+            setSyncError(null);
+          },
+          (error) => {
+            console.error('Live Firestore onSnapshot listener error:', error);
+            setLiveStatus('error');
+            setSyncError(error.message);
+          }
+        );
+      } catch (err) {
+        console.error('Error creating live Firestore query:', err);
+        setLiveStatus('error');
+        setSyncError(err.message);
+      }
+    } else {
+      // Fallback when Firebase credentials are not in .env
+      setLiveStatus('unconfigured');
+      const local = JSON.parse(localStorage.getItem('portfolio_real_reviews') || '[]');
+      setReviews(local);
+
+      const handleStorageUpdate = () => {
+        const updated = JSON.parse(localStorage.getItem('portfolio_real_reviews') || '[]');
+        setReviews(updated);
+      };
+      window.addEventListener('storage', handleStorageUpdate);
+      window.addEventListener('portfolio-review-added', handleStorageUpdate);
+      unsubscribeReviews = () => {
+        window.removeEventListener('storage', handleStorageUpdate);
+        window.removeEventListener('portfolio-review-added', handleStorageUpdate);
+      };
+    }
+
+    // Subscribe to live likes
+    const unsubscribeLikes = subscribeToLikes((count) => {
+      setLikes(count);
+    });
+
     const storedLiked = localStorage.getItem('portfolio_user_has_liked') === 'true';
     setHasLiked(storedLiked);
 
-    // Subscribe to real-time reviews
-    const unsubReviews = subscribeToReviews((fetchedReviews) => {
-      setReviews(fetchedReviews);
-    });
-
-    // Subscribe to real-time likes
-    const unsubLikes = subscribeToLikes((fetchedLikes) => {
-      setLikes(fetchedLikes);
-    });
-
     return () => {
-      if (typeof unsubReviews === 'function') unsubReviews();
-      if (typeof unsubLikes === 'function') unsubLikes();
+      if (typeof unsubscribeReviews === 'function') unsubscribeReviews();
+      if (typeof unsubscribeLikes === 'function') unsubscribeLikes();
     };
   }, []);
 
   // Handle Heart Like Button click
   const handleLike = async () => {
-    // 3. Prevention: Strictly block if user has already liked
     if (hasLiked) return;
     try {
       if (typeof window !== 'undefined' && localStorage.getItem('portfolio_user_has_liked') === 'true') {
@@ -66,10 +119,9 @@ export default function Reviews() {
         return;
       }
     } catch {
-      // Continue if localStorage access issues
+      // Continue if localStorage blocked
     }
 
-    // 1. Restriction Logic: Store flag in browser localStorage
     try {
       localStorage.setItem('portfolio_user_has_liked', 'true');
     } catch (e) {
@@ -77,7 +129,7 @@ export default function Reviews() {
     }
     setHasLiked(true);
 
-    // Generate floating heart particle
+    // Floating heart particle animation
     const heartId = Date.now() + Math.random();
     setFloatingHearts((prev) => [...prev, { id: heartId, x: (Math.random() - 0.5) * 40 }]);
 
@@ -85,7 +137,6 @@ export default function Reviews() {
       setFloatingHearts((prev) => prev.filter((h) => h.id !== heartId));
     }, 1200);
 
-    // Confetti burst
     confetti({
       particleCount: 35,
       spread: 60,
@@ -100,7 +151,7 @@ export default function Reviews() {
     }
   };
 
-  // Handle Review submission
+  // 4. Form Submission: Saves Name, Email, Message, Rating, and Server Timestamp
   const handleSubmitReview = async (e) => {
     e.preventDefault();
     setFormError('');
@@ -135,13 +186,53 @@ export default function Reviews() {
     setFormStatus('submitting');
 
     try {
-      await addReview({
-        name: name.trim(),
-        email: trimmedEmail,
-        role: role.trim() || 'Visitor / Tech Peer',
-        rating,
-        message: message.trim(),
-      });
+      const trimmedName = name.trim();
+      const trimmedRole = role.trim() || 'Visitor / Tech Peer';
+      const trimmedMessage = message.trim();
+      const numRating = Number(rating) || 5;
+
+      const gradientColors = [
+        'from-brand-violet to-brand-cyan',
+        'from-emerald-500 to-cyan-500',
+        'from-purple-500 to-pink-500',
+        'from-amber-500 to-rose-500',
+        'from-blue-500 to-teal-400',
+      ];
+      const avatarColor = gradientColors[Math.floor(Math.random() * gradientColors.length)];
+      const initials = getInitials(trimmedName);
+
+      if (db && isFirebaseConfigured) {
+        // Direct live submission to Firestore with serverTimestamp()
+        await addDoc(collection(db, 'reviews'), {
+          name: trimmedName,
+          email: trimmedEmail,
+          message: trimmedMessage,
+          rating: numRating,
+          role: trimmedRole,
+          createdAt: serverTimestamp(),
+          avatarColor,
+          initials,
+          verified: false,
+        });
+      } else {
+        // Local device fallback if Firebase keys have not yet been provided in .env
+        const newReview = {
+          id: `review-${Date.now()}`,
+          name: trimmedName,
+          email: trimmedEmail,
+          message: trimmedMessage,
+          rating: numRating,
+          role: trimmedRole,
+          formattedDate: formatReviewTimestamp(new Date()),
+          timestampMs: Date.now(),
+          avatarColor,
+          initials,
+          verified: false,
+        };
+        const existing = JSON.parse(localStorage.getItem('portfolio_real_reviews') || '[]');
+        localStorage.setItem('portfolio_real_reviews', JSON.stringify([newReview, ...existing]));
+        window.dispatchEvent(new CustomEvent('portfolio-review-added'));
+      }
 
       setFormStatus('success');
       confetti({
@@ -164,7 +255,7 @@ export default function Reviews() {
     } catch (err) {
       console.error('Error submitting review:', err);
       setFormStatus('error');
-      setFormError(err.message || 'Failed to post review. Please try again.');
+      setFormError(err.message || 'Failed to post review. Please check your connection.');
     }
   };
 
@@ -217,17 +308,56 @@ export default function Reviews() {
           </p>
 
           {/* Real-time Cloud Synced Badge */}
-          <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-dark-900/80 border border-white/[0.08] text-[11px] font-mono text-slate-400">
-            <span className={`w-2 h-2 rounded-full ${isFirebaseLive ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
-            <span>
-              {isFirebaseLive ? '🟢 Live Firestore Database Real-time Synced' : '🟡 Local Device Mode (Add Firebase in .env to Sync Across Devices)'}
-            </span>
+          <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-dark-900/80 border border-white/[0.08] text-[11px] font-mono text-slate-400 shadow-sm">
+            {liveStatus === 'connected' ? (
+              <>
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span className="text-emerald-400 font-semibold">
+                  Live Real-Time Synced (onSnapshot Active)
+                </span>
+              </>
+            ) : liveStatus === 'error' ? (
+              <>
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                <span className="text-rose-400">Database Connection Issue: Check Rules</span>
+              </>
+            ) : (
+              <>
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                <span className="text-amber-300">Local Device Mode (Firebase Keys Needed in .env)</span>
+              </>
+            )}
           </div>
 
-          {!isFirebaseLive && (
-            <div className="mt-3 max-w-xl mx-auto p-2.5 sm:p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] font-mono text-amber-300 text-center flex items-center justify-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
-              <span>Cross-device real-time sync activates once Firebase keys are in <code className="px-1 py-0.5 rounded bg-dark-950/80 text-amber-200">.env</code>. Currently storing on this device.</span>
+          {/* Setup / Status alerts */}
+          {liveStatus === 'unconfigured' && (
+            <div className="mt-3 max-w-xl mx-auto p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] font-mono text-amber-300 text-left flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+              <div>
+                <p className="font-semibold text-amber-200">Global Sync Setup Guide:</p>
+                <p className="mt-0.5 text-slate-300">
+                  To sync reviews live across all devices worldwide like Facebook comments, add your Firebase keys in <code className="px-1 py-0.5 rounded bg-dark-950/80 text-amber-200">.env</code> (<code className="text-slate-300">VITE_FIREBASE_API_KEY</code>, <code className="text-slate-300">VITE_FIREBASE_PROJECT_ID</code>, etc.).
+                </p>
+              </div>
+            </div>
+          )}
+
+          {liveStatus === 'error' && syncError && (
+            <div className="mt-3 max-w-xl mx-auto p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] font-mono text-rose-300 text-left flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+              <div>
+                <p className="font-semibold text-rose-200">Firebase Firestore Notice:</p>
+                <p className="mt-0.5 text-slate-300">
+                  {syncError.includes('permission') || syncError.includes('rules') ? (
+                    <span>Make sure Firestore Security Rules allow read/write in Firebase Console: <code className="px-1 py-0.5 rounded bg-dark-950 text-rose-200">allow read, write: if true;</code></span>
+                  ) : (
+                    <span>{syncError}</span>
+                  )}
+                </p>
+              </div>
             </div>
           )}
         </div>
@@ -385,13 +515,14 @@ export default function Reviews() {
                 <MessageSquare className="w-5 h-5 text-brand-cyan" />
                 <span>Leave a Review</span>
               </h3>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-brand-violet/10 text-brand-cyan border border-brand-violet/20">
-                Public Guestbook
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-brand-violet/10 text-brand-cyan border border-brand-violet/20 flex items-center gap-1">
+                <Wifi className="w-3 h-3 text-brand-cyan" />
+                <span>Live Feed</span>
               </span>
             </div>
 
             <p className="text-xs text-slate-400 mb-5 leading-relaxed">
-              Shared an academic module with me at SLIIT, collaborated on a project, or reviewing my portfolio? Your feedback is highly appreciated!
+              Shared an academic module with me at SLIIT, collaborated on a project, or reviewing my portfolio? Your feedback is broadcast live to all visitors!
             </p>
 
             {formStatus === 'success' ? (
@@ -403,9 +534,9 @@ export default function Reviews() {
                 <div className="w-14 h-14 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 mx-auto flex items-center justify-center">
                   <CheckCircle2 className="w-7 h-7" />
                 </div>
-                <h4 className="text-base sm:text-lg font-bold text-white">Review Published!</h4>
+                <h4 className="text-base sm:text-lg font-bold text-white">Review Broadcasted Live!</h4>
                 <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                  Thank you! Your testimonial is now live in real-time on this portfolio for all visitors.
+                  Thank you! Your testimonial is now live in real-time across all visitor screens.
                 </p>
                 <button
                   onClick={() => setFormStatus('idle')}
@@ -546,7 +677,7 @@ export default function Reviews() {
                   {formStatus === 'submitting' ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Publishing to Guestbook...</span>
+                      <span>Broadcasting to Feed...</span>
                     </>
                   ) : (
                     <>
@@ -557,7 +688,7 @@ export default function Reviews() {
                 </button>
 
                 <p className="text-[10px] text-center text-slate-500 font-mono">
-                  All reviews are stored in the live database with automatic real-time timestamps.
+                  All reviews update instantly in real-time for all active visitors.
                 </p>
               </form>
             )}
@@ -604,9 +735,10 @@ export default function Reviews() {
                 </button>
               </div>
 
-              <span className="text-[11px] font-mono text-slate-500">
-                Sorted by Newest
-              </span>
+              <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-500">
+                <Clock className="w-3.5 h-3.5 text-brand-cyan" />
+                <span>Global Feed • Latest First</span>
+              </div>
             </div>
 
             {/* Reviews Cards List */}

@@ -1,6 +1,4 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
-  getFirestore, 
   collection, 
   addDoc, 
   onSnapshot, 
@@ -11,49 +9,15 @@ import {
   setDoc, 
   increment 
 } from 'firebase/firestore';
+import { db, isFirebaseConfigured } from '../firebase';
 
-// Check if Firebase keys are populated in environment variables
-export const isFirebaseConfigured = () => {
-  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
-  const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
-  return Boolean(
-    projectId &&
-    projectId.trim() !== '' &&
-    projectId !== 'your_project_id' &&
-    apiKey &&
-    apiKey.trim() !== '' &&
-    apiKey !== 'your_firebase_api_key'
-  );
-};
+export { db, isFirebaseConfigured };
 
-// Initialize Firebase App instance lazily
-let dbInstance = null;
-
-const getDb = () => {
-  if (!isFirebaseConfigured()) return null;
-  if (!dbInstance) {
-    try {
-      const firebaseConfig = {
-        apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`,
-        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-        storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.appspot.com`,
-        messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-        appId: import.meta.env.VITE_FIREBASE_APP_ID,
-      };
-
-      const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-      dbInstance = getFirestore(app);
-    } catch (err) {
-      console.warn('Firebase initialization skipped or encountered error:', err);
-      return null;
-    }
-  }
-  return dbInstance;
-};
-
-// Helper to format date in exact friendly format: "Oct 5, 2026 at 4:06 PM"
+/**
+ * Format timestamp nicely into "Oct 5, 2026 at 4:06 PM"
+ */
 export const formatReviewTimestamp = (dateInput) => {
+  if (!dateInput) return 'Recently';
   const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
   if (isNaN(date.getTime())) {
     return 'Recently';
@@ -74,7 +38,9 @@ export const formatReviewTimestamp = (dateInput) => {
   return `${datePart} at ${timePart}`;
 };
 
-// Generate two-letter initials from name
+/**
+ * Generate 2-letter initials from name
+ */
 export const getInitials = (name = '') => {
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) {
@@ -83,19 +49,15 @@ export const getInitials = (name = '') => {
   return (name.slice(0, 2) || 'NC').toUpperCase();
 };
 
-// Local storage keys
 const LOCAL_STORAGE_REVIEWS_KEY = 'portfolio_real_reviews';
 const LOCAL_STORAGE_LIKES_KEY = 'portfolio_real_likes';
 
-// Get local stored reviews (STRICTLY NO DUMMY DATA)
 const getLocalReviews = () => {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_REVIEWS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        return parsed;
-      }
+      if (Array.isArray(parsed)) return parsed;
     }
   } catch (e) {
     console.error('Error reading reviews from localStorage:', e);
@@ -104,79 +66,80 @@ const getLocalReviews = () => {
 };
 
 /**
- * Real-time Reviews Subscription
- * Connects directly to Firestore 'reviews' collection using onSnapshot.
- * Displays ONLY real data from the database.
+ * Parse a Firestore doc snapshot into a review object
  */
-export const subscribeToReviews = (callback) => {
-  const db = getDb();
+export const parseReviewDoc = (docSnap) => {
+  const data = docSnap.data();
+  let formattedDate = 'Just now';
+  let timestampMs = Date.now();
 
-  if (db) {
+  if (data.createdAt) {
+    if (typeof data.createdAt.toDate === 'function') {
+      const d = data.createdAt.toDate();
+      formattedDate = formatReviewTimestamp(d);
+      timestampMs = d.getTime();
+    } else if (data.createdAt.seconds) {
+      const d = new Date(data.createdAt.seconds * 1000);
+      formattedDate = formatReviewTimestamp(d);
+      timestampMs = d.getTime();
+    } else if (typeof data.createdAt === 'string') {
+      const d = new Date(data.createdAt);
+      formattedDate = formatReviewTimestamp(d);
+      timestampMs = d.getTime();
+    }
+  } else if (data.timestampMs) {
+    timestampMs = Number(data.timestampMs);
+    formattedDate = formatReviewTimestamp(new Date(timestampMs));
+  } else if (data.formattedDate) {
+    formattedDate = data.formattedDate;
+  }
+
+  return {
+    id: docSnap.id,
+    name: data.name || 'Anonymous',
+    email: data.email || '',
+    role: data.role || 'Visitor / Developer',
+    rating: Number(data.rating) || 5,
+    message: data.message || '',
+    formattedDate,
+    timestampMs,
+    initials: data.initials || getInitials(data.name || 'A'),
+    avatarColor: data.avatarColor || 'from-brand-violet to-brand-cyan',
+    verified: Boolean(data.verified),
+  };
+};
+
+/**
+ * Real-time Reviews Listener via Firestore onSnapshot
+ * Strictly queries ALL reviews ordered by createdAt descending (global visibility, no user ID filtering)
+ */
+export const subscribeToReviews = (callback, onError) => {
+  if (db && isFirebaseConfigured) {
     try {
       const reviewsRef = collection(db, 'reviews');
+      const q = query(reviewsRef, orderBy('createdAt', 'desc'));
 
-      // Real-time listener: onSnapshot updates immediately on any device submission
       const unsubscribe = onSnapshot(
-        reviewsRef,
+        q,
         (snapshot) => {
-          if (snapshot.empty) {
-            callback([]);
-            return;
-          }
-
-          const reviews = snapshot.docs.map((docSnap) => {
-            const data = docSnap.data();
-            let formattedDate = data.formattedDate;
-            let timestampMs = Date.now();
-
-            if (data.createdAt && typeof data.createdAt.toDate === 'function') {
-              const d = data.createdAt.toDate();
-              formattedDate = formatReviewTimestamp(d);
-              timestampMs = d.getTime();
-            } else if (data.createdAt?.seconds) {
-              const d = new Date(data.createdAt.seconds * 1000);
-              formattedDate = formatReviewTimestamp(d);
-              timestampMs = d.getTime();
-            } else if (data.timestampMs) {
-              timestampMs = Number(data.timestampMs);
-              formattedDate = formatReviewTimestamp(new Date(timestampMs));
-            } else if (data.createdAt) {
-              formattedDate = formatReviewTimestamp(data.createdAt);
-            }
-
-            return {
-              id: docSnap.id,
-              name: data.name || 'Anonymous',
-              email: data.email || '',
-              role: data.role || 'Visitor / Developer',
-              rating: Number(data.rating) || 5,
-              message: data.message || '',
-              formattedDate: formattedDate || formatReviewTimestamp(new Date()),
-              timestampMs,
-              initials: getInitials(data.name || 'A'),
-              avatarColor: data.avatarColor || 'from-brand-violet to-brand-cyan',
-              verified: Boolean(data.verified),
-            };
-          });
-
-          // Sort by newest timestamp descending so real-time updates instantly surface at the top
-          reviews.sort((a, b) => (b.timestampMs || 0) - (a.timestampMs || 0));
-
+          const reviews = snapshot.docs.map(parseReviewDoc);
           callback(reviews);
         },
         (error) => {
-          console.error('Firestore reviews subscription failed, falling back to local:', error);
+          console.error('Firestore live reviews subscription failed:', error);
+          if (onError) onError(error);
           callback(getLocalReviews());
         }
       );
 
       return unsubscribe;
     } catch (err) {
-      console.error('Could not establish Firestore listener:', err);
+      console.error('Failed to establish Firestore live listener:', err);
+      if (onError) onError(err);
     }
   }
 
-  // Fallback to local storage (only real user submissions)
+  // Fallback to local storage when Firebase is not configured in .env
   callback(getLocalReviews());
 
   const handleStorageChange = () => {
@@ -193,7 +156,8 @@ export const subscribeToReviews = (callback) => {
 };
 
 /**
- * Add a New Review to the database (Includes Name, Email, Role, Rating, Message, Timestamp)
+ * Add a New Review to the database
+ * Saves Name, Email, Message, Rating, and Server Timestamp
  */
 export const addReview = async ({ name, email, role, rating, message }) => {
   const trimmedName = name.trim();
@@ -215,9 +179,7 @@ export const addReview = async ({ name, email, role, rating, message }) => {
   ];
   const avatarColor = gradientColors[Math.floor(Math.random() * gradientColors.length)];
 
-  const db = getDb();
-
-  if (db) {
+  if (db && isFirebaseConfigured) {
     try {
       const docRef = await addDoc(collection(db, 'reviews'), {
         name: trimmedName,
@@ -251,7 +213,7 @@ export const addReview = async ({ name, email, role, rating, message }) => {
     }
   }
 
-  // Local storage fallback for real submissions
+  // Local storage fallback for local testing without Firebase credentials
   const newReview = {
     id: `review-${Date.now()}`,
     name: trimmedName,
@@ -275,12 +237,10 @@ export const addReview = async ({ name, email, role, rating, message }) => {
 };
 
 /**
- * Real-time Global Likes Subscription (Strictly Real Data)
+ * Real-time Global Likes Subscription via Firestore onSnapshot
  */
 export const subscribeToLikes = (callback) => {
-  const db = getDb();
-
-  if (db) {
+  if (db && isFirebaseConfigured) {
     try {
       const likesDocRef = doc(db, 'stats', 'likes');
 
@@ -329,9 +289,7 @@ export const subscribeToLikes = (callback) => {
  * Increment Global Likes
  */
 export const incrementLikes = async () => {
-  const db = getDb();
-
-  if (db) {
+  if (db && isFirebaseConfigured) {
     try {
       const likesDocRef = doc(db, 'stats', 'likes');
       await setDoc(likesDocRef, { count: increment(1) }, { merge: true });
@@ -341,7 +299,6 @@ export const incrementLikes = async () => {
     }
   }
 
-  // Local fallback
   const current = Number(localStorage.getItem(LOCAL_STORAGE_LIKES_KEY)) || 0;
   const next = current + 1;
   localStorage.setItem(LOCAL_STORAGE_LIKES_KEY, String(next));
