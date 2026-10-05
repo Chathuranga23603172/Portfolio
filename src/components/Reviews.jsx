@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Heart, Star, MessageSquare, Sparkles, Send, 
   CheckCircle2, Clock, ThumbsUp, AlertCircle, 
-  Filter, ShieldCheck, Quote, ChevronDown, Flame
+  Filter, ShieldCheck, Quote, ChevronDown, Flame, Mail
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { 
@@ -22,6 +22,7 @@ export default function Reviews() {
   
   // Form State
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [role, setRole] = useState('');
   const [rating, setRating] = useState(5);
   const [hoverRating, setHoverRating] = useState(0);
@@ -112,6 +113,16 @@ export default function Reviews() {
       setFormError('Name must be at least 2 characters.');
       return;
     }
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setFormError('Please enter your email address.');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setFormError('Please enter a valid email address (e.g. yourname@example.com).');
+      return;
+    }
     if (!message.trim()) {
       setFormError('Please write a short message or recommendation.');
       return;
@@ -126,6 +137,7 @@ export default function Reviews() {
     try {
       await addReview({
         name: name.trim(),
+        email: trimmedEmail,
         role: role.trim() || 'Visitor / Tech Peer',
         rating,
         message: message.trim(),
@@ -141,6 +153,7 @@ export default function Reviews() {
 
       // Clear form
       setName('');
+      setEmail('');
       setRole('');
       setRating(5);
       setMessage('');
@@ -207,9 +220,16 @@ export default function Reviews() {
           <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-dark-900/80 border border-white/[0.08] text-[11px] font-mono text-slate-400">
             <span className={`w-2 h-2 rounded-full ${isFirebaseLive ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
             <span>
-              {isFirebaseLive ? '🟢 Live Firestore Database Real-time Synced' : '🟡 Real-time Ready (Firebase Config Enabled)'}
+              {isFirebaseLive ? '🟢 Live Firestore Database Real-time Synced' : '🟡 Local Device Mode (Add Firebase in .env to Sync Across Devices)'}
             </span>
           </div>
+
+          {!isFirebaseLive && (
+            <div className="mt-3 max-w-xl mx-auto p-2.5 sm:p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] font-mono text-amber-300 text-center flex items-center justify-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+              <span>Cross-device real-time sync activates once Firebase keys are in <code className="px-1 py-0.5 rounded bg-dark-950/80 text-amber-200">.env</code>. Currently storing on this device.</span>
+            </div>
+          )}
         </div>
 
         {/* Top Highlight Strip: Interactive Like Button & Aggregate Stats */}
@@ -419,6 +439,28 @@ export default function Reviews() {
                     maxLength={50}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-dark-950/80 border border-white/[0.1] focus:border-brand-violet text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none transition-colors"
                   />
+                </div>
+
+                {/* Email Address Field */}
+                <div>
+                  <label className="block text-[11px] font-mono text-slate-400 uppercase mb-1.5" htmlFor="review-email">
+                    YOUR EMAIL ADDRESS <span className="text-rose-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="email"
+                      id="review-email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="e.g. yourname@example.com"
+                      maxLength={80}
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-dark-950/80 border border-white/[0.1] focus:border-brand-violet text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none transition-colors"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-mono mt-1 block">
+                    Saved to database (kept confidential, never displayed publicly).
+                  </span>
                 </div>
 
                 {/* Role / Organization Field */}

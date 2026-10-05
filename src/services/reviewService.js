@@ -105,8 +105,8 @@ const getLocalReviews = () => {
 
 /**
  * Real-time Reviews Subscription
- * Connects directly to Firestore 'reviews' collection.
- * Displays ONLY real data from the database. If empty, returns empty array [].
+ * Connects directly to Firestore 'reviews' collection using onSnapshot.
+ * Displays ONLY real data from the database.
  */
 export const subscribeToReviews = (callback) => {
   const db = getDb();
@@ -114,10 +114,10 @@ export const subscribeToReviews = (callback) => {
   if (db) {
     try {
       const reviewsRef = collection(db, 'reviews');
-      const q = query(reviewsRef, orderBy('createdAt', 'desc'));
 
+      // Real-time listener: onSnapshot updates immediately on any device submission
       const unsubscribe = onSnapshot(
-        q,
+        reviewsRef,
         (snapshot) => {
           if (snapshot.empty) {
             callback([]);
@@ -133,6 +133,13 @@ export const subscribeToReviews = (callback) => {
               const d = data.createdAt.toDate();
               formattedDate = formatReviewTimestamp(d);
               timestampMs = d.getTime();
+            } else if (data.createdAt?.seconds) {
+              const d = new Date(data.createdAt.seconds * 1000);
+              formattedDate = formatReviewTimestamp(d);
+              timestampMs = d.getTime();
+            } else if (data.timestampMs) {
+              timestampMs = Number(data.timestampMs);
+              formattedDate = formatReviewTimestamp(new Date(timestampMs));
             } else if (data.createdAt) {
               formattedDate = formatReviewTimestamp(data.createdAt);
             }
@@ -140,6 +147,7 @@ export const subscribeToReviews = (callback) => {
             return {
               id: docSnap.id,
               name: data.name || 'Anonymous',
+              email: data.email || '',
               role: data.role || 'Visitor / Developer',
               rating: Number(data.rating) || 5,
               message: data.message || '',
@@ -151,17 +159,20 @@ export const subscribeToReviews = (callback) => {
             };
           });
 
+          // Sort by newest timestamp descending so real-time updates instantly surface at the top
+          reviews.sort((a, b) => (b.timestampMs || 0) - (a.timestampMs || 0));
+
           callback(reviews);
         },
         (error) => {
-          console.warn('Firestore reviews subscription failed, reading local database:', error);
+          console.error('Firestore reviews subscription failed, falling back to local:', error);
           callback(getLocalReviews());
         }
       );
 
       return unsubscribe;
     } catch (err) {
-      console.warn('Could not establish Firestore listener:', err);
+      console.error('Could not establish Firestore listener:', err);
     }
   }
 
@@ -182,10 +193,11 @@ export const subscribeToReviews = (callback) => {
 };
 
 /**
- * Add a New Review to the database
+ * Add a New Review to the database (Includes Name, Email, Role, Rating, Message, Timestamp)
  */
-export const addReview = async ({ name, role, rating, message }) => {
+export const addReview = async ({ name, email, role, rating, message }) => {
   const trimmedName = name.trim();
+  const trimmedEmail = email ? email.trim() : '';
   const trimmedRole = role ? role.trim() : 'Visitor / Developer';
   const trimmedMessage = message.trim();
   const numRating = Math.max(1, Math.min(5, Number(rating) || 5));
@@ -209,10 +221,12 @@ export const addReview = async ({ name, role, rating, message }) => {
     try {
       const docRef = await addDoc(collection(db, 'reviews'), {
         name: trimmedName,
+        email: trimmedEmail,
         role: trimmedRole,
         rating: numRating,
         message: trimmedMessage,
         createdAt: serverTimestamp(),
+        timestampMs: now.getTime(),
         formattedDate,
         avatarColor,
         initials,
@@ -222,10 +236,12 @@ export const addReview = async ({ name, role, rating, message }) => {
       return {
         id: docRef.id,
         name: trimmedName,
+        email: trimmedEmail,
         role: trimmedRole,
         rating: numRating,
         message: trimmedMessage,
         formattedDate,
+        timestampMs: now.getTime(),
         initials,
         avatarColor,
       };
@@ -239,6 +255,7 @@ export const addReview = async ({ name, role, rating, message }) => {
   const newReview = {
     id: `review-${Date.now()}`,
     name: trimmedName,
+    email: trimmedEmail,
     role: trimmedRole,
     rating: numRating,
     message: trimmedMessage,
