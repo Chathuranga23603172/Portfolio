@@ -5,6 +5,7 @@ import About from './components/About';
 import Skills from './components/Skills';
 import Projects from './components/Projects';
 import Experience from './components/Experience';
+import Reviews from './components/Reviews';
 import Contact from './components/Contact';
 import Footer from './components/Footer';
 import CvModal from './components/CvModal';
@@ -33,6 +34,7 @@ export default function App() {
           <Skills />
           <Projects />
           <Experience />
+          <Reviews />
           <Contact />
         </main>
 

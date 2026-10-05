@@ -13,7 +13,7 @@ export default function Navbar({ onOpenCv }) {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
 
-      const sections = ['hero', 'about', 'skills', 'projects', 'experience', 'contact'];
+      const sections = ['hero', 'about', 'skills', 'projects', 'experience', 'reviews', 'contact'];
       const scrollPosition = window.scrollY + 200;
 
       for (const section of sections) {
@@ -38,6 +38,7 @@ export default function Navbar({ onOpenCv }) {
     { name: 'Skills', href: '#skills' },
     { name: 'Projects', href: '#projects' },
     { name: 'Experience', href: '#experience' },
+    { name: 'Reviews', href: '#reviews' },
     { name: 'Contact', href: '#contact' },
   ];
 

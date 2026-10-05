@@ -307,14 +307,17 @@ export default function Projects() {
 
             {/* Error notification banner if any */}
             {error && (
-              <div className="mb-6 sm:mb-8 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs sm:text-sm flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 shrink-0 text-amber-400" />
-                <div className="flex-1">
+              <div className="mb-6 sm:mb-8 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs sm:text-sm flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="w-5 h-5 shrink-0 text-amber-400" />
                   <span className="font-semibold">{error}</span>
-                  <span className="block text-slate-400 text-xs mt-0.5">
-                    Displaying curated top repositories for Nirmal Chathuranga.
-                  </span>
                 </div>
+                <button
+                  onClick={() => loadRepositories(username)}
+                  className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-xs font-mono font-medium transition-colors cursor-pointer"
+                >
+                  Retry Fetch
+                </button>
               </div>
             )}
 

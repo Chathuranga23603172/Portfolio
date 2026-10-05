@@ -1,5 +1,3 @@
-import { fallbackProjects } from '../data/portfolioData';
-
 export const LANGUAGE_COLORS = {
   JavaScript: '#f7df1e',
   TypeScript: '#3178c6',
@@ -10,6 +8,7 @@ export const LANGUAGE_COLORS = {
   PHP: '#4F5D95',
   'C++': '#f34b7d',
   'C#': '#178600',
+  C: '#555555',
   Go: '#00ADD8',
   Shell: '#89e051',
   Kotlin: '#A97BFF',
@@ -19,14 +18,18 @@ export const LANGUAGE_COLORS = {
 
 const CACHE_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
+/**
+ * Fetch strictly real public repositories from GitHub REST API.
+ * NO fallback or mock projects.
+ */
 export async function fetchUserRepositories(username = 'Chathuranga23603172') {
-  const cacheKey = `gh_repos_${username.toLowerCase()}`;
-  const cached = localStorage.getItem(cacheKey);
+  const cacheKey = `gh_repos_real_${username.toLowerCase()}`;
+  const cached = typeof localStorage !== 'undefined' ? localStorage.getItem(cacheKey) : null;
 
   if (cached) {
     try {
       const parsed = JSON.parse(cached);
-      if (Date.now() - parsed.timestamp < CACHE_DURATION_MS && parsed.data?.length > 0) {
+      if (Date.now() - parsed.timestamp < CACHE_DURATION_MS && Array.isArray(parsed.data)) {
         return {
           repos: parsed.data,
           totalCount: parsed.totalCount || parsed.data.length,
@@ -35,12 +38,12 @@ export async function fetchUserRepositories(username = 'Chathuranga23603172') {
         };
       }
     } catch {
-      // cache read failed, continue to network
+      // cache read failed, continue to network fetch
     }
   }
 
   try {
-    const response = await fetch(`https://api.github.com/users/${username}/repos?sort=updated&per_page=30`, {
+    const response = await fetch(`https://api.github.com/users/${username}/repos?sort=updated&per_page=50`, {
       headers: {
         Accept: 'application/vnd.github.v3+json',
       },
@@ -48,7 +51,7 @@ export async function fetchUserRepositories(username = 'Chathuranga23603172') {
 
     if (!response.ok) {
       if (response.status === 403 || response.status === 429) {
-        throw new Error('GitHub API rate limit reached. Displaying featured repositories.');
+        throw new Error('GitHub API rate limit reached. Please try again shortly.');
       } else if (response.status === 404) {
         throw new Error(`GitHub user "${username}" not found.`);
       }
@@ -61,50 +64,40 @@ export async function fetchUserRepositories(username = 'Chathuranga23603172') {
       throw new Error('Unexpected response format from GitHub API');
     }
 
-    // Filter out forks if plenty, prioritize repos with descriptions or code
-    const ownRepos = data.filter((r) => !r.fork);
-    const candidateRepos = ownRepos.length >= 4 ? ownRepos : data;
-
-    // Filter out the profile readme repository itself (named after username)
-    const validRepos = candidateRepos.filter(
+    // Filter out the profile readme repo itself (named after username)
+    const validRepos = data.filter(
       (r) => r.name.toLowerCase() !== username.toLowerCase()
     );
 
-    // Format and clean repos
-    const formattedRepos = validRepos.slice(0, 6).map((repo) => {
-      // Match with fallback details if description is missing
-      const fallback = fallbackProjects.find((f) => f.name.toLowerCase() === repo.name.toLowerCase());
+    // Strictly map actual repositories returned from the GitHub REST API
+    const formattedRepos = validRepos.map((repo) => ({
+      id: repo.id,
+      name: repo.name,
+      description: repo.description || 'Public GitHub repository.',
+      html_url: repo.html_url,
+      homepage: repo.homepage || '',
+      language: repo.language || 'Code',
+      stargazers_count: repo.stargazers_count || 0,
+      forks_count: repo.forks_count || 0,
+      updated_at: repo.updated_at,
+      topics: Array.isArray(repo.topics) ? repo.topics : [],
+      isFork: repo.fork,
+    }));
 
-      return {
-        id: repo.id,
-        name: repo.name,
-        description:
-          repo.description ||
-          fallback?.description ||
-          `Open source software repository by ${username}. Built with ${repo.language || 'modern technologies'}.`,
-        html_url: repo.html_url,
-        homepage: repo.homepage || fallback?.homepage || '',
-        language: repo.language || fallback?.language || 'JavaScript',
-        stargazers_count: repo.stargazers_count,
-        forks_count: repo.forks_count,
-        updated_at: repo.updated_at,
-        topics: repo.topics && repo.topics.length > 0 ? repo.topics : fallback?.topics || ['software-engineering', 'full-stack'],
-        isFork: repo.fork,
-      };
-    });
-
-    // Save to cache
-    try {
-      localStorage.setItem(
-        cacheKey,
-        JSON.stringify({
-          data: formattedRepos,
-          totalCount: data.length,
-          timestamp: Date.now(),
-        })
-      );
-    } catch {
-      // localStorage may be disabled or full
+    // Cache valid response
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(
+          cacheKey,
+          JSON.stringify({
+            data: formattedRepos,
+            totalCount: data.length,
+            timestamp: Date.now(),
+          })
+        );
+      } catch {
+        // localStorage may be disabled or quota exceeded
+      }
     }
 
     return {
@@ -114,18 +107,9 @@ export async function fetchUserRepositories(username = 'Chathuranga23603172') {
       error: null,
     };
   } catch (err) {
-    console.warn('GitHub API fetch failed or rate limited:', err.message);
+    console.warn('GitHub API fetch failed:', err.message);
 
-    // If username is the owner, return the rich fallback projects
-    if (username.toLowerCase() === 'chathuranga23603172') {
-      return {
-        repos: fallbackProjects,
-        totalCount: 16,
-        fromCache: false,
-        error: err.message,
-      };
-    }
-
+    // Strictly return empty repos list with error message — NO MOCK OR FALLBACK DATA
     return {
       repos: [],
       totalCount: 0,

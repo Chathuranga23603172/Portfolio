@@ -373,7 +373,7 @@ export default function Contact() {
                       name="name"
                       value={formData.name}
                       onChange={handleChange}
-                      placeholder="e.g. Sithum Kavinda / Engineering Manager"
+                      placeholder="Enter your name"
                       className={`w-full px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-dark-950/80 border text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none transition-colors ${
                         fieldErrors.name
                           ? 'border-rose-500/70 focus:border-rose-400'
