@@ -133,14 +133,14 @@ export default function Contact() {
   return (
     <section id="contact" className="py-16 sm:py-20 md:py-28 relative">
       {/* Glow backgrounds */}
-      <div className="absolute top-1/2 left-1/4 w-[300px] sm:w-[500px] h-[200px] sm:h-[300px] bg-brand-violet/10 blur-[100px] sm:blur-[130px] pointer-events-none rounded-full" />
-      <div className="absolute bottom-10 right-4 sm:right-10 w-48 sm:w-72 h-48 sm:h-72 bg-brand-cyan/10 blur-[80px] sm:blur-[110px] pointer-events-none rounded-full" />
+      <div className="absolute top-1/2 left-1/4 w-[300px] sm:w-[500px] h-[200px] sm:h-[300px] bg-brand-violet/10 blur-[45px] sm:blur-[60px] pointer-events-none rounded-full" style={{ transform: 'translate3d(0,0,0)', WebkitTransform: 'translate3d(0,0,0)' }} />
+      <div className="absolute bottom-10 right-4 sm:right-10 w-48 sm:w-72 h-48 sm:h-72 bg-brand-cyan/10 blur-[40px] sm:blur-[50px] pointer-events-none rounded-full" style={{ transform: 'translate3d(0,0,0)', WebkitTransform: 'translate3d(0,0,0)' }} />
 
       {/* Floating Toast Notification */}
       <AnimatePresence>
         {toast && (
           <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            initial={{ opacity: 0.01, y: -20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
             className="fixed top-20 sm:top-24 left-3 right-3 sm:left-auto sm:right-8 z-50 max-w-md w-auto sm:w-full shadow-2xl"
@@ -196,9 +196,9 @@ export default function Contact() {
           
           {/* Left Column: Direct Contact Info & Profiles */}
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0.01, x: -16 }}
             whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.05 }}
             transition={{ duration: 0.6 }}
             className="lg:col-span-5 space-y-4 sm:space-y-6"
           >
@@ -314,9 +314,9 @@ export default function Contact() {
 
           {/* Right Column: Contact Form with Live Backend Delivery */}
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 0.01, x: 16 }}
             whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.05 }}
             transition={{ duration: 0.6 }}
             className="lg:col-span-7"
           >

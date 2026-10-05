@@ -37,19 +37,25 @@ export default function Hero({ onOpenCv }) {
       <HeroParticleCanvas />
 
       {/* === Background Layer 2: Dynamic Glowing Gradient Mesh Orbs (Continuous Drift) === */}
-      <div className="absolute top-1/4 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[350px] sm:w-[550px] md:w-[650px] h-[300px] sm:h-[450px] bg-gradient-to-tr from-brand-violet/20 via-brand-cyan/20 to-transparent blur-[110px] sm:blur-[140px] pointer-events-none rounded-full animate-mesh-1" />
-      <div className="absolute -top-10 right-2 sm:right-10 w-56 sm:w-80 h-56 sm:h-80 bg-brand-purple/15 blur-[90px] sm:blur-[110px] pointer-events-none rounded-full animate-mesh-2" />
-      <div className="absolute bottom-6 left-2 sm:left-10 w-60 sm:w-96 h-60 sm:h-96 bg-brand-cyan/15 blur-[90px] sm:blur-[120px] pointer-events-none rounded-full animate-mesh-3" />
+      <div className="absolute top-1/4 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[320px] sm:w-[500px] md:w-[600px] h-[280px] sm:h-[400px] bg-gradient-to-tr from-brand-violet/20 via-brand-cyan/20 to-transparent blur-[50px] sm:blur-[70px] pointer-events-none rounded-full animate-mesh-1" style={{ transform: 'translate3d(0,0,0)', WebkitTransform: 'translate3d(0,0,0)' }} />
+      <div className="absolute -top-10 right-2 sm:right-10 w-56 sm:w-80 h-56 sm:h-80 bg-brand-purple/15 blur-[45px] sm:blur-[60px] pointer-events-none rounded-full animate-mesh-2" style={{ transform: 'translate3d(0,0,0)', WebkitTransform: 'translate3d(0,0,0)' }} />
+      <div className="absolute bottom-6 left-2 sm:left-10 w-60 sm:w-96 h-60 sm:h-96 bg-brand-cyan/15 blur-[45px] sm:blur-[60px] pointer-events-none rounded-full animate-mesh-3" style={{ transform: 'translate3d(0,0,0)', WebkitTransform: 'translate3d(0,0,0)' }} />
 
-      {/* Background Layer 3: Tech Grid Overlay Pattern */}
-      <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:24px_24px] sm:bg-[size:32px_32px] pointer-events-none [mask-image:radial-gradient(ellipse_60%_50%_at_50%_40%,#000_70%,transparent_100%)] z-0" />
+      {/* Background Layer 3: Tech Grid Overlay Pattern (with -webkit-mask-image fallback) */}
+      <div 
+        className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:24px_24px] sm:bg-[size:32px_32px] pointer-events-none z-0" 
+        style={{ 
+          WebkitMaskImage: 'radial-gradient(ellipse 60% 50% at 50% 40%, #000 70%, transparent 100%)',
+          maskImage: 'radial-gradient(ellipse 60% 50% at 50% 40%, #000 70%, transparent 100%)' 
+        }} 
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 sm:gap-12 lg:gap-8 items-center">
           
           {/* Left Column: Headline, Bio & Actions */}
           <motion.div
-            initial={{ opacity: 0, y: 24 }}
+            initial={{ opacity: 0.01, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
             className="lg:col-span-7 text-center lg:text-left space-y-5 sm:space-y-6"
@@ -145,7 +151,7 @@ export default function Hero({ onOpenCv }) {
 
           {/* Right Column: 144Hz High-Fidelity Transparent Profile Avatar with Levitating Glow & Data Streams */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0.01, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className="lg:col-span-5 flex justify-center items-center relative w-full select-none"
@@ -406,7 +412,7 @@ export default function Hero({ onOpenCv }) {
 
         {/* Quick Stats Strip */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0.01, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.4 }}
           className="mt-12 sm:mt-16 pt-6 sm:pt-8 border-t border-white/[0.06] grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6"

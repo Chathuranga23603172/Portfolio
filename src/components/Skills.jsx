@@ -37,8 +37,8 @@ export default function Skills() {
   return (
     <section id="skills" className="py-16 sm:py-20 md:py-28 relative overflow-hidden">
       {/* Background glow effects */}
-      <div className="absolute top-1/3 right-1/4 w-[300px] sm:w-[500px] h-[200px] sm:h-[300px] bg-brand-cyan/10 blur-[100px] sm:blur-[130px] pointer-events-none rounded-full" />
-      <div className="absolute bottom-10 left-4 sm:left-10 w-48 sm:w-72 h-48 sm:h-72 bg-brand-violet/10 blur-[80px] sm:blur-[100px] pointer-events-none rounded-full" />
+      <div className="absolute top-1/3 right-1/4 w-[300px] sm:w-[500px] h-[200px] sm:h-[300px] bg-brand-cyan/10 blur-[45px] sm:blur-[60px] pointer-events-none rounded-full" style={{ transform: 'translate3d(0,0,0)', WebkitTransform: 'translate3d(0,0,0)' }} />
+      <div className="absolute bottom-10 left-4 sm:left-10 w-48 sm:w-72 h-48 sm:h-72 bg-brand-violet/10 blur-[40px] sm:blur-[50px] pointer-events-none rounded-full" style={{ transform: 'translate3d(0,0,0)', WebkitTransform: 'translate3d(0,0,0)' }} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
@@ -90,9 +90,9 @@ export default function Skills() {
                 <motion.div
                   layout
                   key={skill.name}
-                  initial={{ opacity: 0, scale: 0.8 }}
+                  initial={{ opacity: 0.01, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
+                  exit={{ opacity: 0.01, scale: 0.9 }}
                   transition={{ duration: 0.3, delay: index * 0.02 }}
                   whileHover={{ y: -6, scale: 1.03 }}
                   onClick={() => setActiveSkill(skill)}
@@ -148,7 +148,7 @@ export default function Skills() {
         {/* Selected Skill Spotlight Card */}
         {activeSkill && (
           <motion.div
-            initial={{ opacity: 0, y: 15 }}
+            initial={{ opacity: 0.01, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             key={activeSkill.name}
             className="mt-8 sm:mt-12 p-4 sm:p-6 rounded-2xl glass-card border border-brand-violet/30 max-w-2xl mx-auto flex flex-col sm:flex-row items-center gap-4 sm:gap-6 shadow-xl"

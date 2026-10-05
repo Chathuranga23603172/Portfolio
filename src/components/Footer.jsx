@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUp, Mail, Heart, Sparkles } from 'lucide-react';
+import { ArrowUp, Mail, Sparkles } from 'lucide-react';
 import { GithubIcon as Github, LinkedinIcon as Linkedin } from './Icons';
 import { personalInfo } from '../data/portfolioData';
 
@@ -11,7 +11,7 @@ export default function Footer() {
   return (
     <footer className="relative border-t border-white/[0.06] bg-dark-950 pt-12 sm:pt-16 pb-10 sm:pb-12 overflow-hidden">
       {/* Background glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-72 sm:w-96 h-28 sm:h-32 bg-brand-violet/10 blur-[80px] sm:blur-[100px] pointer-events-none rounded-full" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-72 sm:w-96 h-28 sm:h-32 bg-brand-violet/10 blur-[40px] sm:blur-[50px] pointer-events-none rounded-full" style={{ transform: 'translate3d(-50%,0,0)', WebkitTransform: 'translate3d(-50%,0,0)' }} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 sm:gap-8 pb-10 sm:pb-12 border-b border-white/[0.06]">

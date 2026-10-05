@@ -343,8 +343,8 @@ export default function Reviews() {
     <section id="reviews" className="py-16 sm:py-20 md:py-28 relative overflow-hidden">
       
       {/* Background ambient glow orbs */}
-      <div className="absolute top-1/3 left-10 w-72 sm:w-96 h-72 sm:h-96 bg-rose-500/10 blur-[110px] pointer-events-none rounded-full" />
-      <div className="absolute bottom-10 right-10 w-72 sm:w-96 h-72 sm:h-96 bg-brand-violet/10 blur-[110px] pointer-events-none rounded-full" />
+      <div className="absolute top-1/3 left-10 w-72 sm:w-96 h-72 sm:h-96 bg-rose-500/10 blur-[45px] sm:blur-[55px] pointer-events-none rounded-full" style={{ transform: 'translate3d(0,0,0)', WebkitTransform: 'translate3d(0,0,0)' }} />
+      <div className="absolute bottom-10 right-10 w-72 sm:w-96 h-72 sm:h-96 bg-brand-violet/10 blur-[45px] sm:blur-[55px] pointer-events-none rounded-full" style={{ transform: 'translate3d(0,0,0)', WebkitTransform: 'translate3d(0,0,0)' }} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
@@ -819,7 +819,7 @@ export default function Reviews() {
                   filteredReviews.map((rev, idx) => (
                     <motion.div
                       key={rev.id || idx}
-                      initial={{ opacity: 0, y: 15 }}
+                      initial={{ opacity: 0.01, y: 15 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95 }}
                       transition={{ duration: 0.4, delay: idx * 0.05 }}

@@ -34,9 +34,9 @@ export default function CvModal({ isOpen, onClose }) {
 
         {/* Modal Window */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          initial={{ opacity: 0.01, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          exit={{ opacity: 0.01, scale: 0.95, y: 20 }}
           className="relative w-full max-w-4xl bg-dark-900 border border-white/[0.1] rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden z-10 my-4 sm:my-8 print:border-none print:shadow-none print:m-0 print:bg-white print:text-black"
         >
           {/* Header Controls (Hidden on Print) */}

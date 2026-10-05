@@ -161,9 +161,9 @@ export default function Navbar({ onOpenCv }) {
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
+            initial={{ opacity: 0.01, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
+            exit={{ opacity: 0.01, height: 0 }}
             className="md:hidden glass-nav border-t border-white/[0.06] px-4 pt-3 pb-6 mt-2 space-y-3"
           >
             <div className="flex flex-col space-y-1">

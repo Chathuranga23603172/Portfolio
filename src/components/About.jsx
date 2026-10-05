@@ -34,7 +34,7 @@ export default function About() {
   return (
     <section id="about" className="py-16 sm:py-20 md:py-28 relative">
       {/* Background glow */}
-      <div className="absolute top-1/2 left-0 w-48 sm:w-72 h-48 sm:h-72 bg-brand-violet/10 blur-[80px] sm:blur-[100px] pointer-events-none rounded-full" />
+      <div className="absolute top-1/2 left-0 w-48 sm:w-72 h-48 sm:h-72 bg-brand-violet/10 blur-[40px] sm:blur-[50px] pointer-events-none rounded-full" style={{ transform: 'translate3d(0,0,0)', WebkitTransform: 'translate3d(0,0,0)' }} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
@@ -57,9 +57,9 @@ export default function About() {
           
           {/* Left: Bio & SLIIT Details */}
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0.01, x: -16 }}
             whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.05 }}
             transition={{ duration: 0.6 }}
             className="lg:col-span-6 space-y-5 sm:space-y-6"
           >
@@ -110,9 +110,9 @@ export default function About() {
 
           {/* Right: Interactive Code Window / Dev Config */}
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 0.01, x: 16 }}
             whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.05 }}
             transition={{ duration: 0.6 }}
             className="lg:col-span-6 w-full"
           >
@@ -158,9 +158,9 @@ export default function About() {
             return (
               <motion.div
                 key={pillar.title}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0.01, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
+                viewport={{ once: true, amount: 0.05 }}
                 transition={{ duration: 0.5, delay: idx * 0.1 }}
                 className="glass-card-hover p-5 sm:p-6 rounded-2xl relative group"
               >
